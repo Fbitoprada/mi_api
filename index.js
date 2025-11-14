@@ -28,18 +28,41 @@ db.connect(err => {
 app.post('/registro', (req, res) => {
   const { nombre, usuario, contrasena } = req.body;
 
-  // Encriptamos la contraseña antes de guardarla
-  const hash = bcrypt.hashSync(contrasena, 10);
+  if (!nombre || !usuario || !contrasena) {
+    return res.status(400).json({ mensaje: 'Faltan datos en la solicitud' });
+  }
 
+  // Verificar si el usuario ya existe
   db.query(
-    'INSERT INTO usuarios (nombre, usuario, contrasena) VALUES (?, ?, ?)',
-    [nombre, usuario, hash],
-    (err, result) => {
+    'SELECT * FROM usuarios WHERE usuario = ?',
+    [usuario],
+    (err, results) => {
       if (err) {
-        res.status(500).json({ mensaje: 'Error al registrar usuario' });
-      } else {
-        res.json({ mensaje: 'Usuario registrado correctamente' });
+        return res.status(500).json({ mensaje: 'Error en el servidor' });
       }
+
+      if (results.length > 0) {
+        return res.status(409).json({
+          mensaje: 'El usuario ya existe, elija otro nombre de usuario'
+        });
+      }
+
+      // Encriptar contraseña
+      const hash = bcrypt.hashSync(contrasena, 10);
+
+      // Insertar nuevo usuario
+      db.query(
+        'INSERT INTO usuarios (nombre, usuario, contrasena) VALUES (?, ?, ?)',
+        [nombre, usuario, hash],
+        (err, result) => {
+          if (err) {
+            console.error('Error al registrar usuario:', err);
+            return res.status(500).json({ mensaje: 'Error al registrar usuario' });
+          }
+
+          res.json({ mensaje: 'Usuario registrado correctamente' });
+        }
+      );
     }
   );
 });
@@ -63,7 +86,7 @@ app.post('/login', (req, res) => {
   });
 });
 
-// Iniciar el servidor
+
 app.listen(3000, () => {
   console.log('Servidor ejecutándose en http://localhost:3000');
 });
